@@ -1,0 +1,76 @@
+name: Build and Push Images to ECR
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  AWS_REGION: ${{ secrets.AWS_REGION }}
+  AWS_ACCOUNT_ID: ${{ secrets.AWS_ACCOUNT_ID }}
+  ECR_FRONTEND_REPOSITORY: front-despacho
+  ECR_VENTAS_REPOSITORY: back-ventas
+  ECR_DESPACHOS_REPOSITORY: back-despachos
+
+jobs:
+  build-and-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: read
+      id-token: write
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-region: ${{ env.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Set image URIs
+        id: image-uris
+        run: |
+          echo "FRONTEND_IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_FRONTEND_REPOSITORY}" >> $GITHUB_ENV
+          echo "VENTAS_IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_VENTAS_REPOSITORY}" >> $GITHUB_ENV
+          echo "DESPACHOS_IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_DESPACHOS_REPOSITORY}" >> $GITHUB_ENV
+
+      - name: Build and push backend ventas
+        uses: docker/build-push-action@v6
+        with:
+          context: ./back-Ventas_SpringBoot/Springboot-API-REST
+          file: ./back-Ventas_SpringBoot/Springboot-API-REST/Dockerfile
+          push: true
+          tags: |
+            ${{ env.VENTAS_IMAGE_URI }}:latest
+            ${{ env.VENTAS_IMAGE_URI }}:${{ github.sha }}
+
+      - name: Build and push backend despachos
+        uses: docker/build-push-action@v6
+        with:
+          context: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+          file: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO/Dockerfile
+          push: true
+          tags: |
+            ${{ env.DESPACHOS_IMAGE_URI }}:latest
+            ${{ env.DESPACHOS_IMAGE_URI }}:${{ github.sha }}
+
+      - name: Build and push frontend
+        uses: docker/build-push-action@v6
+        with:
+          context: ./front_despacho
+          file: ./front_despacho/Dockerfile
+          push: true
+          build-args: |
+            VITE_API_VENTAS_URL=${{ secrets.VITE_API_VENTAS_URL }}
+            VITE_API_DESPACHOS_URL=${{ secrets.VITE_API_DESPACHOS_URL }}
+          tags: |
+            ${{ env.FRONTEND_IMAGE_URI }}:latest
+            ${{ env.FRONTEND_IMAGE_URI }}:${{ github.sha }}
