@@ -19,7 +19,6 @@ jobs:
 
     permissions:
       contents: read
-      id-token: write
 
     steps:
       - name: Checkout repository
@@ -28,15 +27,16 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-region: ${{ env.AWS_REGION }}
-          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ secrets.AWS_REGION }}
 
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set image URIs
-        id: image-uris
         run: |
           echo "FRONTEND_IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_FRONTEND_REPOSITORY}" >> $GITHUB_ENV
           echo "VENTAS_IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_VENTAS_REPOSITORY}" >> $GITHUB_ENV
@@ -68,9 +68,6 @@ jobs:
           context: ./front_despacho
           file: ./front_despacho/Dockerfile
           push: true
-          build-args: |
-            VITE_API_VENTAS_URL=${{ secrets.VITE_API_VENTAS_URL }}
-            VITE_API_DESPACHOS_URL=${{ secrets.VITE_API_DESPACHOS_URL }}
           tags: |
             ${{ env.FRONTEND_IMAGE_URI }}:latest
             ${{ env.FRONTEND_IMAGE_URI }}:${{ github.sha }}
