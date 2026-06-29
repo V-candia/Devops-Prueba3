@@ -19,6 +19,7 @@ jobs:
 
     permissions:
       contents: read
+      id-token: write
 
     steps:
       - name: Checkout repository
@@ -27,10 +28,8 @@ jobs:
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
           aws-region: ${{ secrets.AWS_REGION }}
+          role-to-assume: ${{ secrets.AWS_ROLE_TO_ASSUME }}
 
       - name: Login to Amazon ECR
         id: login-ecr
@@ -42,6 +41,15 @@ jobs:
           echo "VENTAS_IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_VENTAS_REPOSITORY}" >> $GITHUB_ENV
           echo "DESPACHOS_IMAGE_URI=${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_DESPACHOS_REPOSITORY}" >> $GITHUB_ENV
 
+      # ==========================
+      # BACKEND VENTAS
+      # ==========================
+      - name: Build backend ventas JAR
+        working-directory: ./back-Ventas_SpringBoot/Springboot-API-REST
+        run: |
+          chmod +x mvnw
+          ./mvnw clean package -DskipTests
+
       - name: Build and push backend ventas
         uses: docker/build-push-action@v6
         with:
@@ -51,6 +59,15 @@ jobs:
           tags: |
             ${{ env.VENTAS_IMAGE_URI }}:latest
             ${{ env.VENTAS_IMAGE_URI }}:${{ github.sha }}
+
+      # ==========================
+      # BACKEND DESPACHOS
+      # ==========================
+      - name: Build backend despachos JAR
+        working-directory: ./back-Despachos_SpringBoot/Springboot-API-REST-DESPACHO
+        run: |
+          chmod +x mvnw
+          ./mvnw clean package -DskipTests
 
       - name: Build and push backend despachos
         uses: docker/build-push-action@v6
@@ -62,12 +79,18 @@ jobs:
             ${{ env.DESPACHOS_IMAGE_URI }}:latest
             ${{ env.DESPACHOS_IMAGE_URI }}:${{ github.sha }}
 
+      # ==========================
+      # FRONTEND
+      # ==========================
       - name: Build and push frontend
         uses: docker/build-push-action@v6
         with:
           context: ./front_despacho
           file: ./front_despacho/Dockerfile
           push: true
+          build-args: |
+            VITE_API_VENTAS_URL=${{ secrets.VITE_API_VENTAS_URL }}
+            VITE_API_DESPACHOS_URL=${{ secrets.VITE_API_DESPACHOS_URL }}
           tags: |
             ${{ env.FRONTEND_IMAGE_URI }}:latest
             ${{ env.FRONTEND_IMAGE_URI }}:${{ github.sha }}
